@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Translator</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <h1>Translator</h1>
+  <label for="sourceLang">Source Language:</label>
+  <select id="sourceLang">
+    <option value="auto">Auto</option>
+    <option value="en">English</option>
+    <option value="ja">Japanese</option>
+    <option value="zh">Chinese</option>
+    <!-- Add more languages as needed -->
+  </select>
+  
+  <label for="targetLang">Target Language:</label>
+  <select id="targetLang">
+    <option value="en">English</option>
+    <option value="ja">Japanese</option>
+    <option value="zh">Chinese</option>
+    <!-- Add more languages as needed -->
+  </select>
+
+  <label for="source">Select Translation Source:</label>
+  <select id="source">
+    <option value="deepl">DeepL</option>
+    <option value="google">Google Translate</option>
+  </select>
+
+  <button id="translateBtn">Translate</button>
+</body>
+<script src="popup.js"></script>
+</html>
