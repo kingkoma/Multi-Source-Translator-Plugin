@@ -1,4 +1,16 @@
 console.log('Content script loaded');
+function getConfig() {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({action: "getConfig"}, function(response) {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError);
+      } else {
+        resolve(response);
+      }
+    });
+  });
+}
+
 if ('speechSynthesis' in window) {
   console.log("Web Speech API supported!")
 } else {
@@ -188,14 +200,17 @@ function translateWithGoogle(text, sourceLang, targetLang) {
     });
 }
 
-function translateWithDeepL(text, sourceLang, targetLang) {
+async function translateWithDeepL(text, sourceLang, targetLang) {
   const mappedSourceLang = mapLanguageCode(sourceLang, 'deepl');
   const mappedTargetLang = mapLanguageCode(targetLang, 'deepl');
   
-  const apiKey = getNextDeeplApiKey();
+  const config = await getConfig();
+  const deeplApiKeys = config.DEEPL_API_KEYS;
+  const apiKey = getNextDeeplApiKey(deeplApiKeys);
+  
   if (!apiKey) {
     translations['deepl'] = 'Error: All API keys exhausted';
-    return Promise.resolve();
+    return;
   }
 
   return new Promise((resolve, reject) => {
@@ -218,12 +233,6 @@ function translateWithDeepL(text, sourceLang, targetLang) {
         reject(new Error(response.error));
       }
     });
-  }).catch(error => {
-    console.error('DeepL translation error:', error);
-    // If there are more API keys, try the next one
-    if (currentDeeplKeyIndex < deeplApiKeys.length) {
-      return translateWithDeepL(text, sourceLang, targetLang);
-    }
   });
 }
 
@@ -249,7 +258,8 @@ function translateWithMyMemory(text, sourceLang, targetLang) {
 }
 
 async function convertToKatakana(text) {
-  const apiKey = CONFIG.GOO_LABS_API_KEY;
+  const config = await getConfig();
+  const apiKey = config.GOO_LABS_API_KEY;
   const apiUrl = 'https://labs.goo.ne.jp/api/hiragana';
   
   const response = await fetch(apiUrl, {
@@ -379,11 +389,10 @@ function showTranslation(translations, currentTargetLang, originalText, sourceLa
   });
 }
 
-const deeplApiKeys = CONFIG.DEEPL_API_KEYS;
 
 let currentDeeplKeyIndex = 0;
 
-function getNextDeeplApiKey() {
+function getNextDeeplApiKey(deeplApiKeys) {
   if (currentDeeplKeyIndex < deeplApiKeys.length) {
     const apiKey = deeplApiKeys[currentDeeplKeyIndex];
     currentDeeplKeyIndex++;

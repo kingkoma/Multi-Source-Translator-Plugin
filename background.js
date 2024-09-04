@@ -1,3 +1,5 @@
+import { CONFIG } from './config.js';
+
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: "translateSelection",
@@ -78,6 +80,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "getIconURL") {
     sendResponse({iconURL: chrome.runtime.getURL("icons/icon16.png")});
+  }
+  // ... other message handlers ...
+});
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "getConfig") {
+    sendResponse(CONFIG);
   }
   // ... other message handlers ...
 });
