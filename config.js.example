@@ -1,0 +1,14 @@
+export const CONFIG = {
+  GOO_LABS_API_KEY: 'example',
+  DEEPL_API_KEYS: [
+    { key: 'example', type: 'free' },
+    { key: 'example', type: 'pro' },
+  ],
+  ICON_URL: 'icons/icon16.png',
+};
+
+export function getConfig() {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ action: "getConfig" }, resolve);
+  });
+}
