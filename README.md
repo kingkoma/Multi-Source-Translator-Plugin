@@ -41,3 +41,5 @@ API keys and other configuration settings can be found in `config.js`. Make sure
 - MyMemory Translation API
 - Goo Labs API (for Japanese katakana conversion)
 
+## License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
