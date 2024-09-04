@@ -49,7 +49,7 @@ const createQuickIcon = (iconURL) => {
   }
 
   quickIcon.style.cssText = `
-    position: fixed !important;
+    position: absolute !important;
     z-index: 2147483647 !important;
     cursor: pointer !important;
     background: white !important;
@@ -62,8 +62,6 @@ const createQuickIcon = (iconURL) => {
     font-size: 16px !important;
     box-shadow: 0 2px 5px rgba(0,0,0,0.2) !important;
     display: none !important;
-    top: 0 !important;
-    left: 0 !important;
   `;
 
   document.body.appendChild(quickIcon);
@@ -79,8 +77,11 @@ const showQuickIcon = (event) => {
   if (selection.toString().trim().length > 0) {
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
-    quickIcon.style.top = `${rect.bottom + window.scrollY}px`;
-    quickIcon.style.left = `${rect.right + window.scrollX}px`;
+
+    // Position the icon to the right of the selection
+    quickIcon.style.left = `${rect.right + 5}px`;
+    quickIcon.style.top = `${rect.top + window.scrollY}px`;
+
     quickIcon.style.setProperty('display', 'block', 'important');
     
     // Force a repaint
