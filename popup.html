@@ -6,7 +6,7 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <h1>Translator</h1>
+  <input type="text" id="textToTranslate" placeholder="Text to translate">
   <label for="sourceLang">Source Language:</label>
   <select id="sourceLang">
     <option value="auto">Auto</option>
@@ -26,8 +26,8 @@
 
   <label for="source">Select Translation Source:</label>
   <select id="source">
+    <option value="google">Google</option>
     <option value="deepl">DeepL</option>
-    <option value="google">Google Translate</option>
   </select>
 
   <button id="translateBtn">Translate</button>
