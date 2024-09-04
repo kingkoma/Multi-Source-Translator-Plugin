@@ -1,57 +1,49 @@
 console.log('Content script loaded');
-function getConfig() {
+
+// Constants
+const ICON_SIZE = 20;
+const QUICK_ICON_ID = 'translation-quick-icon';
+
+// Utility functions
+const getConfig = () => {
   return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({action: "getConfig"}, function(response) {
-      if (chrome.runtime.lastError) {
-        reject(chrome.runtime.lastError);
-      } else {
-        resolve(response);
-      }
+    chrome.runtime.sendMessage({action: "getConfig"}, (response) => {
+      chrome.runtime.lastError ? reject(chrome.runtime.lastError) : resolve(response);
     });
   });
-}
+};
 
-if ('speechSynthesis' in window) {
-  console.log("Web Speech API supported!")
-} else {
-  alert("Web Speech API not supported :-(")
-  // Implement fallback or inform the user
-}
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log('Message received in content script:', request);
-
-  if (request.action === 'translate') {
-    console.log('Translating:', request.text);
-    // Start the translation process
-    translateText(request.text, request.targetLang)
-      .then(() => {
-        // Send a response back to the background script
-        sendResponse({ success: true });
-      })
-      .catch(error => {
-        console.error('Translation error:', error);
-        sendResponse({ success: false, error: error.message });
-      });
+const mapLanguageCode = (code, service) => {
+  const mapping = {
+    // English
+    'en': { google: 'en', deepl: 'EN', mymemory: 'eng' },
     
-    // Return true to indicate that we will send a response asynchronously
-    return true;
+    // Chinese (Simplified)
+    'zh': { google: 'zh-CN', deepl: 'ZH', mymemory: 'chi' },
+    'zh-CN': { google: 'zh-CN', deepl: 'ZH', mymemory: 'chi' },
+    
+    // Chinese (Traditional)
+    'zh-TW': { google: 'zh-TW', deepl: 'ZH', mymemory: 'cht' },
+    
+    // Japanese
+    'ja': { google: 'ja', deepl: 'JA', mymemory: 'jpn' },
+  };
+
+  if (mapping[code] && mapping[code][service]) {
+    return mapping[code][service];
   }
-});
 
-let iconURL = null;
+  // If no specific mapping is found, return the original code
+  return code;
+};
 
-// Get the icon URL when the script loads
-chrome.runtime.sendMessage({action: "getIconURL"}, function(response) {
-  iconURL = response.iconURL;
-  createQuickIcon();
-});
-
-function createQuickIcon() {
+// UI-related functions
+const createQuickIcon = (iconURL) => {
   const quickIcon = document.createElement('div');
-  quickIcon.id = 'translation-quick-icon';
+  quickIcon.id = QUICK_ICON_ID;
   
   if (iconURL) {
-    quickIcon.innerHTML = `<img src="${iconURL}" width="20" height="20">`;
+    quickIcon.innerHTML = `<img src="${iconURL}" width="${ICON_SIZE}" height="${ICON_SIZE}">`;
   } else {
     quickIcon.textContent = '🌐';
   }
@@ -75,10 +67,10 @@ function createQuickIcon() {
   `;
 
   document.body.appendChild(quickIcon);
-}
+};
 
-function showQuickIcon(event) {
-  const quickIcon = document.getElementById('translation-quick-icon');
+const showQuickIcon = (event) => {
+  const quickIcon = document.getElementById(QUICK_ICON_ID);
   if (!quickIcon) {
     return;
   }
@@ -96,51 +88,10 @@ function showQuickIcon(event) {
   } else {
     quickIcon.style.setProperty('display', 'none', 'important');
   }
-}
+};
 
-// Show the quick icon when text is selected
-document.addEventListener('mouseup', showQuickIcon);
-
-// Global click event listener
-document.addEventListener('click', function(event) {
-  const quickIcon = document.getElementById('translation-quick-icon');
-  if (quickIcon && event.target.closest('#translation-quick-icon')) {
-    const selection = window.getSelection();
-    const selectedText = selection.toString();
-    translateText(selectedText); // Uses default target language (English)
-  }
-});
-
-// Declare translations as a global variable
-let translations = {};
-
-// Add this function to map language codes
-function mapLanguageCode(code, service) {
-  const mapping = {
-    // English
-    'en': { google: 'en', deepl: 'EN', mymemory: 'eng' },
-    
-    // Chinese (Simplified)
-    'zh': { google: 'zh-CN', deepl: 'ZH', mymemory: 'chi' },
-    'zh-CN': { google: 'zh-CN', deepl: 'ZH', mymemory: 'chi' },
-    
-    // Chinese (Traditional)
-    'zh-TW': { google: 'zh-TW', deepl: 'ZH', mymemory: 'cht' },
-    
-    // Japanese
-    'ja': { google: 'ja', deepl: 'JA', mymemory: 'jpn' },
-  };
-
-  if (mapping[code] && mapping[code][service]) {
-    return mapping[code][service];
-  }
-
-  // If no specific mapping is found, return the original code
-  return code;
-}
-
-// Modify the detectLanguage function to use the mapping
-function detectLanguage(text) {
+// Translation-related functions
+const detectLanguage = (text) => {
   const apiUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(text)}`;
   
   return fetch(apiUrl)
@@ -151,41 +102,30 @@ function detectLanguage(text) {
       }
       throw new Error('Unable to detect language');
     });
-}
+};
 
-function translateText(text, targetLang = 'en') {
-  return new Promise((resolve, reject) => {
-    const quickIcon = document.getElementById('translation-quick-icon');
-    if (quickIcon) quickIcon.style.display = 'none !important';
+const translateText = async (text, targetLang = 'en') => {
+  const quickIcon = document.getElementById(QUICK_ICON_ID);
+  if (quickIcon) quickIcon.style.display = 'none !important';
 
-    // Reset translations object for new translation
-    translations = {};
+  // Reset translations object for new translation
+  const translations = {};
 
-    // First, detect the language
-    detectLanguage(text)
-      .then(detectedLang => {
-        console.log('Detected language:', detectedLang);
-        
-        // Now proceed with translations using the detected language
-        return Promise.all([
-          translateWithGoogle(text, detectedLang, targetLang),
-          translateWithDeepL(text, detectedLang, targetLang),
-          translateWithMyMemory(text, detectedLang, targetLang)
-        ]).then(() => detectedLang);  // Pass detected language to the next then
-      })
-      .then((detectedLang) => {
-        showTranslation(translations, targetLang, text, detectedLang);
-        resolve();
-      })
-      .catch(error => {
-        console.error('Translation error:', error);
-        reject(error);
-      });
-  });
-}
+  // First, detect the language
+  const detectedLang = await detectLanguage(text);
+  console.log('Detected language:', detectedLang);
+  
+  // Now proceed with translations using the detected language
+  await Promise.all([
+    translateWithGoogle(text, detectedLang, targetLang, translations),
+    translateWithDeepL(text, detectedLang, targetLang, translations),
+    translateWithMyMemory(text, detectedLang, targetLang, translations)
+  ]);
 
-// Update the translation functions to use the mapped language codes
-function translateWithGoogle(text, sourceLang, targetLang) {
+  showTranslation(translations, targetLang, text, detectedLang);
+};
+
+const translateWithGoogle = (text, sourceLang, targetLang, translations) => {
   const mappedSourceLang = mapLanguageCode(sourceLang, 'google');
   const mappedTargetLang = mapLanguageCode(targetLang, 'google');
   
@@ -198,9 +138,9 @@ function translateWithGoogle(text, sourceLang, targetLang) {
       console.error('Google translation error:', error);
       translations['google'] = 'Error: ' + error.message;
     });
-}
+};
 
-async function translateWithDeepL(text, sourceLang, targetLang) {
+const translateWithDeepL = async (text, sourceLang, targetLang, translations) => {
   const mappedSourceLang = mapLanguageCode(sourceLang, 'deepl');
   const mappedTargetLang = mapLanguageCode(targetLang, 'deepl');
   
@@ -234,9 +174,9 @@ async function translateWithDeepL(text, sourceLang, targetLang) {
       }
     });
   });
-}
+};
 
-function translateWithMyMemory(text, sourceLang, targetLang) {
+const translateWithMyMemory = (text, sourceLang, targetLang, translations) => {
   const mappedSourceLang = mapLanguageCode(sourceLang, 'mymemory');
   const mappedTargetLang = mapLanguageCode(targetLang, 'mymemory');
   
@@ -255,9 +195,10 @@ function translateWithMyMemory(text, sourceLang, targetLang) {
       // console.error('MyMemory translation error:', error);
       translations['mymemory'] = 'Error: ' + error.message;
     });
-}
+};
 
-async function convertToKatakana(text) {
+// Audio-related functions
+const convertToKatakana = async (text) => {
   const config = await getConfig();
   const apiKey = config.GOO_LABS_API_KEY;
   const apiUrl = 'https://labs.goo.ne.jp/api/hiragana';
@@ -280,9 +221,24 @@ async function convertToKatakana(text) {
 
   const data = await response.json();
   return data.converted;
-}
+};
 
-function createTooltip(translations, currentTargetLang, originalText, sourceLang) {
+const playAudio = (text, lang) => {
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = lang;
+  
+  // Find a voice that matches the language
+  const voices = speechSynthesis.getVoices();
+  const voice = voices.find(voice => voice.lang.startsWith(lang)) || voices[0];
+  if (voice) {
+    utterance.voice = voice;
+  }
+
+  speechSynthesis.speak(utterance);
+};
+
+// UI components
+const createTooltip = (translations, currentTargetLang, originalText, sourceLang) => {
   const tooltip = document.createElement('div');
   tooltip.className = 'translation-tooltip';
   tooltip.id = 'my-extension-tooltip';
@@ -338,9 +294,9 @@ function createTooltip(translations, currentTargetLang, originalText, sourceLang
   }
 
   return tooltip;
-}
+};
 
-function showTranslation(translations, currentTargetLang, originalText, sourceLang) {
+const showTranslation = (translations, currentTargetLang, originalText, sourceLang) => {
   // Remove any existing tooltips
   const existingTooltips = document.querySelectorAll('.translation-tooltip');
   existingTooltips.forEach(tooltip => tooltip.remove());
@@ -387,37 +343,59 @@ function showTranslation(translations, currentTargetLang, originalText, sourceLa
       document.removeEventListener('click', removeTooltip);
     }
   });
-}
+};
 
-
+// DeepL API key management
 let currentDeeplKeyIndex = 0;
-
-function getNextDeeplApiKey(deeplApiKeys) {
+const getNextDeeplApiKey = (deeplApiKeys) => {
   if (currentDeeplKeyIndex < deeplApiKeys.length) {
     const apiKey = deeplApiKeys[currentDeeplKeyIndex];
     currentDeeplKeyIndex++;
     return apiKey;
   }
   return null;
-}
-
-// Initialize voices
-speechSynthesis.onvoiceschanged = () => {
-  speechSynthesis.getVoices();
 };
 
-function playAudio(text, lang) {
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = lang;
-  
-  // Find a voice that matches the language
-  const voices = speechSynthesis.getVoices();
-  const voice = voices.find(voice => voice.lang.startsWith(lang)) || voices[0];
-  if (voice) {
-    utterance.voice = voice;
+// Event listeners and initialization
+document.addEventListener('mouseup', showQuickIcon);
+
+document.addEventListener('click', (event) => {
+  const quickIcon = document.getElementById(QUICK_ICON_ID);
+  if (quickIcon && event.target.closest(`#${QUICK_ICON_ID}`)) {
+    const selectedText = window.getSelection().toString();
+    translateText(selectedText);
+  }
+});
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'translate') {
+    console.log('Translating:', request.text);
+    translateText(request.text, request.targetLang)
+      .then(() => sendResponse({ success: true }))
+      .catch(error => {
+        console.error('Translation error:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+    return true;
+  }
+});
+
+// Initialization
+(async () => {
+  if (!('speechSynthesis' in window)) {
+    alert("Web Speech API not supported :-(");
+    return;
   }
 
-  speechSynthesis.speak(utterance);
-}
+  const { iconURL } = await new Promise(resolve => {
+    chrome.runtime.sendMessage({action: "getIconURL"}, resolve);
+  });
+
+  createQuickIcon(iconURL);
+
+  speechSynthesis.onvoiceschanged = () => {
+    speechSynthesis.getVoices();
+  };
+})();
 
 
